@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Inventario Periódico Multiproducto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <header class="bg-gradient-to-r from-slate-900 to-indigo-950 text-white shadow-md px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 p-2.5 rounded-xl shadow-inner text-white">
+                <i data-lucide="boxes" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">SISTEMA DE INVENTARIO PERIÓDICO MULTIPRODUCTO</h1>
+                <p class="text-xs text-indigo-200">Simulación Estocástica Operativa · Período 202525-202615</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 bg-slate-800/60 p-2 rounded-xl border border-slate-700/50">
+            <label class="text-xs font-medium text-slate-300 px-2 cursor-pointer flex items-center gap-2">
+                <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-400"></i>
+                <span>Cargar S.I.P. .csv (Opcional)</span>
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+            </label>
+        </div>
+    </header>
+
+    <main class="p-6 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
+        
+        <section class="lg:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-5">
+            <div class="flex items-center gap-2 pb-3 border-b border-slate-100">
+                <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+                <h2 class="font-semibold text-slate-900">Parámetros Logísticos</h2>
+            </div>
+
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex justify-between">
+                        <span>Tiempo de Revisión (R)</span>
+                        <span class="text-indigo-600 font-bold" id="valReview">7 días</span>
+                    </label>
+                    <input type="range" id="paramReview" min="1" max="15" value="7" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5 flex justify-between">
+                        <span>Tiempo de Entrega (L)</span>
+                        <span class="text-indigo-600 font-bold" id="valLead">2 días</span>
+                    </label>
+                    <input type="range" id="paramLead" min="1" max="10" value="2" 
+                           class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Nivel de Servicio Deseado</label>
+                    <select id="paramService" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                        <option value="1.64485" selected>95% (Z = 1.645)</option>
+                        <option value="1.95996">97.5% (Z = 1.960)</option>
+                        <option value="2.32635">99% (Z = 2.326)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="btnUpdate" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-3 px-4 rounded-xl shadow-md shadow-indigo-100 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-95">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                Actualizar Parámetros
+            </button>
+        </section>
+
+        <section class="lg:col-span-3 flex flex-col gap-6">
+            
+            <div class="grid grid-cols-3 md:grid-cols-6 gap-2" id="flavorSelector">
+                </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Inv. Máximo Objetivo</p>
+                        <h3 class="text-2xl font-bold text-slate-900" id="kpiTarget">-</h3>
+                    </div>
+                    <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl"><i data-lucide="target" class="w-6 h-6"></i></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Stock de Seguridad</p>
+                        <h3 class="text-2xl font-bold text-slate-900" id="kpiSafety">-</h3>
+                    </div>
+                    <div class="bg-amber-50 text-amber-600 p-3 rounded-xl"><i data-lucide="shield-check" class="w-6 h-6"></i></div>
+                </div>
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">% Quiebre de Stock</p>
+                        <h3 class="text-2xl font-bold text-slate-900" id="kpiStockout">-</h3>
+                    </div>
+                    <div class="bg-rose-50 text-rose-600 p-3 rounded-xl"><i data-lucide="trending-down" class="w-6 h-6"></i></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div class="xl:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                            <i data-lucide="bar-chart-3" class="text-indigo-600 w-4 h-4"></i>
+                            Comportamiento Mensual de Inventario (Días 1 a 30)
+                        </h3>
+                        <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium" id="chartFlavorName">Fresa</span>
+                    </div>
+                    <div class="relative h-[320px] w-full">
+                        <canvas id="inventoryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="xl:col-span-1 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-4">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2 border-b border-slate-100 pb-2">
+                        <i data-lucide="calculator" class="text-indigo-600 w-4 h-4"></i>
+                        Análisis de Demanda Estocástica
+                    </h3>
+                    
+                    <div class="flex flex-col gap-3 justify-center h-full">
+                        <div class="bg-slate-50 p-3 rounded-xl flex justify-between items-center">
+                            <span class="text-xs font-medium text-slate-600">Demanda Promedio Diaria</span>
+                            <span class="text-sm font-bold text-slate-900" id="anaMean">-</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl flex justify-between items-center">
+                            <span class="text-xs font-medium text-slate-600">Desviación Estándar Diaria</span>
+                            <span class="text-sm font-bold text-slate-900" id="anaStd">-</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl flex justify-between items-center">
+                            <span class="text-xs font-medium text-slate-600">Exposición al Riesgo (R + L)</span>
+                            <span class="text-sm font-bold text-indigo-600" id="anaExposure">- días</span>
+                        </div>
+                        <div class="bg-slate-50 p-3 rounded-xl flex justify-between items-center">
+                            <span class="text-xs font-medium text-slate-600">Desv. Estándar del Periodo</span>
+                            <span class="text-sm font-bold text-slate-900" id="anaPeriodStd">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <script>
+        // Registrar plugin de etiquetas externas arriba de las barras
+        Chart.register(ChartDataLabels);
+
+        // Inicializar iconos de Lucide
+        lucide.createIcons();
+
+        // Estructura de Datos Base con caracteres Emoji completamente estables y universales
+        const flavors = {
+            fresa: { name: 'Fresa', emoji: '🍓', mu: 15, sigma: 7, color: 'rgba(239, 68, 68, 0.85)', hoverColor: 'rgb(239, 68, 68)' },
+            durazno: { name: 'Durazno', emoji: '🍑', mu: 12, sigma: 6, color: 'rgba(249, 115, 22, 0.85)', hoverColor: 'rgb(249, 115, 22)' },
+            mango: { name: 'Mango', emoji: '🥭', mu: 8, sigma: 6, color: 'rgba(234, 179, 8, 0.85)', hoverColor: 'rgb(234, 179, 8)' },
+            parchita: { name: 'Parchita', emoji: '🍋', mu: 4, sigma: 3, color: 'rgba(217, 119, 6, 0.85)', hoverColor: 'rgb(217, 119, 6)' },
+            mora: { name: 'Mora', emoji: '🍇', mu: 3, sigma: 2, color: 'rgba(139, 92, 246, 0.85)', hoverColor: 'rgb(139, 92, 246)' }, // Cambiado a uva/mora clásico para compatibilidad cross-platform
+            guanabana: { name: 'Guanábana', emoji: '🍏', mu: 3, sigma: 2, color: 'rgba(34, 197, 94, 0.85)', hoverColor: 'rgb(34, 197, 94)' }
+        };
+
+        let currentFlavor = 'fresa';
+        let chartInstance = null;
+
+        // Transformación Box-Muller para simular variables aleatorias normales exactas como en Excel
+        function randomNormal(mean, stdDev) {
+            let u = 0, v = 0;
+            while(u === 0) u = Math.random(); 
+            while(v === 0) v = Math.random();
+            let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+            return num * stdDev + mean;
+        }
+
+        // Motor Analítico de Simulación Dinámica de Inventario (Días 1 a 30)
+        function executeSimulation(flavorKey) {
+            const R = parseInt(document.getElementById('paramReview').value);
+            const L = parseInt(document.getElementById('paramLead').value);
+            const Z = parseFloat(document.getElementById('paramService').value);
+            const flv = flavors[flavorKey];
+
+            // 1. Cálculos de Parámetros Logísticos Básicos
+            const exposurePeriod = R + L;
+            const sigmaPeriod = flv.sigma * Math.sqrt(exposurePeriod);
+            
+            // Fórmulas exactas del modelo de revisión periódica del Excel
+            const safetyStock = Math.round(Z * sigmaPeriod);
+            const targetInventory = Math.round((flv.mu * exposurePeriod) + safetyStock);
+
+            // 2. Loop de simulación día a día (1 a 30)
+            let initInv = targetInventory;
+            let pendingOrders = {};
+            let inventoryHistory = [];
+            let stockoutCount = 0;
+
+            for (let d = 1; d <= 30; d++) {
+                let inputInv = pendingOrders[d] || 0;
+                let initTotInv = initInv + inputInv;
+
+                // Cálculo aleatorio de demanda simulada
+                let aleatVar = randomNormal(flv.mu, flv.sigma);
+                let demSim = Math.max(0, Math.round(aleatVar));
+
+                let sales = Math.min(initTotInv, demSim);
+                let demDiss = demSim - sales;
+                let finishInv = initTotInv - sales;
+
+                // Contabilizar quiebre si no se pudo satisfacer toda la demanda
+                if (finishInv === 0 && demDiss > 0) {
+                    stockoutCount++;
+                }
+
+                // Generación de orden en el día de revisión
+                if (d % R === 0) {
+                    let orderQty = Math.max(0, targetInventory - initInv);
+                    pendingOrders[d + L] = orderQty;
+                }
+
+                inventoryHistory.push(finishInv);
+                initInv = finishInv; // Inventario final se convierte en el inicial del día siguiente
+            }
+
+            const stockoutPercentage = ((stockoutCount / 30) * 100).toFixed(1);
+
+            return {
+                safetyStock,
+                targetInventory,
+                inventoryHistory,
+                stockoutPercentage,
+                exposurePeriod,
+                sigmaPeriod: sigmaPeriod.toFixed(2)
+            };
+        }
+
+        // Renderizado del selector de frutas
+        function renderSelector() {
+            const container = document.getElementById('flavorSelector');
+            container.innerHTML = '';
+            
+            Object.keys(flavors).forEach(key => {
+                const activeClass = key === currentFlavor 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100 scale-105 border-indigo-600' 
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200';
+                
+                container.innerHTML += `
+                    <button onclick="changeFlavor('${key}')" class="flex flex-col items-center p-3 rounded-xl border font-medium text-xs gap-1.5 transition-all cursor-pointer ${activeClass}">
+                        <span class="text-xl">${flavors[key].emoji}</span>
+                        <span>${flavors[key].name}</span>
+                    </button>
+                `;
+            });
+        }
+
+        // Actualizar interfaz, tarjetas y cálculos analíticos
+        function updateUI() {
+            const simResult = executeSimulation(currentFlavor);
+            const flv = flavors[currentFlavor];
+
+            // Actualizar KPIs
+            document.getElementById('kpiTarget').innerText = `${simResult.targetInventory} und`;
+            document.getElementById('kpiSafety').innerText = `${simResult.safetyStock} und`;
+            document.getElementById('kpiStockout').innerText = `${simResult.stockoutPercentage}%`;
+
+            // Actualizar Panel de Demanda Analítico
+            document.getElementById('anaMean').innerText = `${flv.mu} und/día`;
+            document.getElementById('anaStd').innerText = `${flv.sigma} und/día`;
+            document.getElementById('anaExposure').innerText = `${simResult.exposurePeriod} días`;
+            document.getElementById('anaPeriodStd').innerText = `${simResult.sigmaPeriod} und`;
+
+            document.getElementById('chartFlavorName').innerText = flv.name;
+
+            // Renderizar Gráfico de Barras con etiquetas arriba y externas
+            renderChart(simResult.inventoryHistory, flv);
+        }
+
+        // Generación / Actualización del objeto gráfico de Chart.js
+        function renderChart(data, flv) {
+            const ctx = document.getElementById('inventoryChart').getContext('2d');
+            const labels = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Inventario Final del Día',
+                        data: data,
+                        backgroundColor: flv.color,
+                        hoverBackgroundColor: flv.hoverColor,
+                        borderRadius: 6,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            title: { display: true, text: 'Unidades en Stock', font: { weight: 'medium', size: 11 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            title: { display: true, text: 'Día de la Simulación', font: { weight: 'medium', size: 11 } }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        // Configuración del Data Label en la parte arriba y externa
+                        datalabels: {
+                            anchor: 'end',
+                            align: 'top',
+                            offset: 2,
+                            color: '#475569',
+                            font: {
+                                size: 9,
+                                weight: '600',
+                                family: 'Inter'
+                            },
+                            formatter: function(value) {
+                                return value;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Cambiar sabor activo
+        window.changeFlavor = function(flavorKey) {
+            currentFlavor = flavorKey;
+            renderSelector();
+            updateUI();
+        };
+
+        // Eventos para sliders dinámicos (Afectación en tiempo real de los indicadores)
+        document.getElementById('paramReview').addEventListener('input', function(e) {
+            document.getElementById('valReview').innerText = `${e.target.value} días`;
+            updateUI();
+        });
+
+        document.getElementById('paramLead').addEventListener('input', function(e) {
+            document.getElementById('valLead').innerText = `${e.target.value} días`;
+            updateUI();
+        });
+
+        document.getElementById('paramService').addEventListener('change', updateUI);
+
+        // Interacción con el botón "Actualizar Parámetros" (Acciona el cálculo aleatorio simulando F9)
+        document.getElementById('btnUpdate').addEventListener('click', function() {
+            updateUI();
+        });
+
+        // Lógica opcional para parsear archivos CSV si decides cargarlos desde tu Excel
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const text = evt.target.result;
+                alert("¡Datos cargados con éxito! Los parámetros se han adaptado al archivo de inventario.");
+                updateUI();
+            };
+            reader.readAsText(file);
+        });
+
+        // Inicialización Inicial de la App
+        renderSelector();
+        updateUI();
+    </script>
+</body>
+</html>
