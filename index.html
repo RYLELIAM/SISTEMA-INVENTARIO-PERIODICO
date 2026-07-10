@@ -163,7 +163,7 @@
             durazno: { name: 'Durazno', emoji: '🍑', mu: 12, sigma: 6, color: 'rgba(249, 115, 22, 0.85)', hoverColor: 'rgb(249, 115, 22)' },
             mango: { name: 'Mango', emoji: '🥭', mu: 8, sigma: 6, color: 'rgba(234, 179, 8, 0.85)', hoverColor: 'rgb(234, 179, 8)' },
             parchita: { name: 'Parchita', emoji: '🍋', mu: 4, sigma: 3, color: 'rgba(217, 119, 6, 0.85)', hoverColor: 'rgb(217, 119, 6)' },
-            mora: { name: 'Mora', emoji: '🍇', mu: 3, sigma: 2, color: 'rgba(139, 92, 246, 0.85)', hoverColor: 'rgb(139, 92, 246)' }, // Cambiado a uva/mora clásico para compatibilidad cross-platform
+            mora: { name: 'Mora', emoji: '🍇', mu: 3, sigma: 2, color: 'rgba(139, 92, 246, 0.85)', hoverColor: 'rgb(139, 92, 246)' },
             guanabana: { name: 'Guanábana', emoji: '🍏', mu: 3, sigma: 2, color: 'rgba(34, 197, 94, 0.85)', hoverColor: 'rgb(34, 197, 94)' }
         };
 
@@ -190,7 +190,7 @@
             const exposurePeriod = R + L;
             const sigmaPeriod = flv.sigma * Math.sqrt(exposurePeriod);
             
-            // Fórmulas exactas del modelo de revisión periódica del Excel
+            // Fórmulas exactas del modelo de revisión periódica
             const safetyStock = Math.round(Z * sigmaPeriod);
             const targetInventory = Math.round((flv.mu * exposurePeriod) + safetyStock);
 
@@ -201,8 +201,12 @@
             let stockoutCount = 0;
 
             for (let d = 1; d <= 30; d++) {
+                // CORRECCIÓN LOGÍSTICA EXCEL: Se registra el Inventario Inicial puro de este día en el gráfico, 
+                // antes de sumar las unidades que entran hoy por reabastecimiento (dejándolas disponibles operativamente).
+                inventoryHistory.push(initInv);
+
                 let inputInv = pendingOrders[d] || 0;
-                let initTotInv = initInv + inputInv;
+                let initTotInv = initInv + inputInv; // Inventario disponible total para cubrir la demanda de hoy
 
                 // Cálculo aleatorio de demanda simulada
                 let aleatVar = randomNormal(flv.mu, flv.sigma);
@@ -217,14 +221,14 @@
                     stockoutCount++;
                 }
 
-                // Generación de orden en el día de revisión
+                // Generación de orden en el día de revisión en base al remanente antes del nuevo stock
                 if (d % R === 0) {
                     let orderQty = Math.max(0, targetInventory - initInv);
                     pendingOrders[d + L] = orderQty;
                 }
 
-                inventoryHistory.push(finishInv);
-                initInv = finishInv; // Inventario final se convierte en el inicial del día siguiente
+                // El inventario final de hoy se convierte en el inventario inicial del día de mañana
+                initInv = finishInv;
             }
 
             const stockoutPercentage = ((stockoutCount / 30) * 100).toFixed(1);
@@ -294,7 +298,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: 'Inventario Final del Día',
+                        label: 'Inventario Inicial del Día',
                         data: data,
                         backgroundColor: flv.color,
                         hoverBackgroundColor: flv.hoverColor,
@@ -309,7 +313,7 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: '#f1f5f9' },
-                            title: { display: true, text: 'Unidades en Stock', font: { weight: 'medium', size: 11 } }
+                            title: { display: true, text: 'Unidades en Stock (Paletas)', font: { weight: 'medium', size: 11 } }
                         },
                         x: {
                             grid: { display: false },
@@ -318,7 +322,6 @@
                     },
                     plugins: {
                         legend: { display: false },
-                        // Configuración del Data Label en la parte arriba y externa
                         datalabels: {
                             anchor: 'end',
                             align: 'top',
@@ -377,7 +380,7 @@
             reader.readAsText(file);
         });
 
-        // Inicialización Inicial de la App
+        // Inicialización de la App
         renderSelector();
         updateUI();
     </script>
